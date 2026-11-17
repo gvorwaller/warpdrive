@@ -1,12 +1,12 @@
 # warpdrive: Warp Bubble Notebook
 
 A Python/Jupyter notebook that visualizes and numerically tests an independent
-researcher's warp-drive ideas: the Alcubierre metric, a cosine "thick wall", and a
+researcher's warp-drive ideas: the Alcubierre metric, a cosine "thick wall" (the Vorwaller Metric), and a
 dual-shell always-on design. Each chart comes with a plain-English caption.
 
 The full spec is in [`docs/warp-bubble-notebook-spec.md`](docs/warp-bubble-notebook-spec.md).
 
-> **Status (2026-11-17):** Sections 1 (wall shapes) and 2 (energy vs wall thickness) are done. Sections 3–6 and `summary.pdf` are still to come.
+> **Status (2026-11-17):** Sections 1 (wall shapes), 2 (energy vs wall thickness) and 3 (quantum inequality) are done. The dual-shell design, animation, time-dependent energy, WarpFactory comparison and `summary.pdf` are still to come.
 
 ## Setup
 
@@ -28,6 +28,7 @@ python3 -m venv .venv
 - `warp_bubble.ipynb`: the notebook. Each section explains itself in plain English.
 - `warp/shapes.py`: the bubble shape functions (Alcubierre, the author's cosine wall, dual shell).
 - `warp/energy.py`: total negative energy of a steady bubble, in SI units.
+- `warp/curvature.py`, `warp/quantum.py`: space-time curvature, and the quantum-inequality test.
 - `warp/plotting.py`: phone-readable figure style; draws each caption into its PNG.
 - `tests/`: checks for every shape function (`.venv/bin/pytest`).
 

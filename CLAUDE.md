@@ -6,7 +6,7 @@ This file guides Claude Code (claude.ai/code) when working in this repository.
 
 A Python/Jupyter notebook that visualizes and numerically tests an independent
 researcher's warp-drive ideas from their handwritten notes: the Alcubierre metric, the cosine
-"thick wall", the superseded pulsed design, and the current
+"thick wall" (Vorwaller Metric), the superseded pulsed design, and the current
 dual-shell always-on design. The audience is a non-physicist reader and the ideas'
 author (who reads results as phone images and printed PDFs).
 
@@ -15,7 +15,9 @@ author (who reads results as phone images and printed PDFs).
 1. **Read `cs.md`** (repo root). It holds the binding hard rules and wins over this file on any conflict.
 2. Run `td usage --new-session` at conversation start (or after `/clear`), then
    `td usage -q` for later reads. `AGENTS.md` requires this.
-3. Read `docs/warp-bubble-notebook-spec.md`. It is the authoritative spec.
+3. Read `docs/warp-bubble-notebook-spec.md`. It was written by Claude (iOS) from the author's
+   handwritten notes. Its tasks and framing may be improved wherever you see a better way (the owner
+   has said so); record each change in the devlog. The author's *equations* stay exactly as written.
 4. Read recent `docs/devlog/` entries.
 
 ## Stack
@@ -34,6 +36,10 @@ author (who reads results as phone images and printed PDFs).
 - `warp/energy.py`: SI energy density, total energy as mass E/c² (full 2-D cylindrical integral and
   the 1-D P&F eq. 26 reduction), closed form and optimum for the cosine wall, IAU mass constants.
   Steady bubble only.
+- `warp/curvature.py`: Riemann and Einstein tensors for any shift S(t,x,y,z), derived once with sympy
+  and evaluated numerically in the Eulerian orthonormal frame. Reuse it for the time-dependent designs (Task 5).
+- `warp/quantum.py`: Ford–Roman quantum inequality applied to a wall (full-curvature r_min, Lorentzian
+  sampling along the real geodesic). Choices deliberately favour the design.
 - `warp/plotting.py`: `use_phone_style()`, `phone_figure()`, `save_figure(fig, name, caption)`, `sci_text()`.
   The caption is drawn into the PNG because figures are viewed without the notebook text.
 - `tests/`: pytest with `filterwarnings = error`, so any numpy overflow fails the suite.

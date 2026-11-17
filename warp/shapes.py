@@ -19,10 +19,12 @@ from scipy.special import expit
 __all__ = [
     "alcubierre_f",
     "alcubierre_df",
+    "alcubierre_ddf",
     "alcubierre_wall_thickness",
     "sigma_for_wall_thickness",
     "cosine_wall_f",
     "cosine_wall_df",
+    "cosine_wall_ddf",
     "cosine_wall_max_slope",
     "cosine_wall_pf_thickness",
     "pf_ramp_f",
@@ -66,6 +68,14 @@ def alcubierre_df(r, R, sigma):
     )
 
 
+def alcubierre_ddf(r, R, sigma):
+    """d²f/dr_s² for Alcubierre's shape. Uses d/dx sech²(x) = -2 sech²(x) tanh(x)."""
+    r = np.asarray(r, dtype=float)
+    a = sigma * (r + R)
+    b = sigma * (r - R)
+    return sigma**2 * (_sech2(b) * np.tanh(b) - _sech2(a) * np.tanh(a)) / np.tanh(sigma * R)
+
+
 def alcubierre_wall_thickness(R, sigma):
     """Pfenning & Ford (1997) eq. 5: Δ = [1 + tanh²(σR)]² / (2σ tanh(σR)).
 
@@ -92,7 +102,7 @@ def sigma_for_wall_thickness(delta, R):
 
 
 # ---------------------------------------------------------------------------
-# The author's cosine wall
+# The author's cosine wall ("Vorwaller Metric")
 #   f = 1                               r < R
 #   f = ½[1 + cos(π (r - R)/Δ)]          R <= r <= R + Δ
 #   f = 0                               r > R + Δ
@@ -124,6 +134,19 @@ def cosine_wall_df(r, R, delta):
     u = (r - R) / delta
     in_wall = (u >= 0.0) & (u <= 1.0)
     return np.where(in_wall, -(np.pi / (2.0 * delta)) * np.sin(np.pi * np.clip(u, 0.0, 1.0)), 0.0)
+
+
+def cosine_wall_ddf(r, R, delta):
+    """d²f/dr_s² = -(π²/2Δ²) cos(π (r - R)/Δ) inside the wall, 0 outside.
+
+    Jumps from 0 to ∓π²/(2Δ²) at the wall edges (the cosine wall is C¹, not C²).
+    At exactly r = R or R + Δ this returns the inside-wall value.
+    """
+    _check_delta(delta)
+    r = np.asarray(r, dtype=float)
+    u = (r - R) / delta
+    in_wall = (u >= 0.0) & (u <= 1.0)
+    return np.where(in_wall, -(np.pi**2 / (2.0 * delta**2)) * np.cos(np.pi * np.clip(u, 0.0, 1.0)), 0.0)
 
 
 def cosine_wall_max_slope(delta):

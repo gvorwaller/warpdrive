@@ -17,7 +17,7 @@ The key obstacle is the **Ford–Roman quantum inequalities**: negative energy c
 
 The author's ideas attack this problem:
 
-1. **Thick wall (cosine-wall metric)**: a smooth cosine wall profile, widened from 1 m to 1000 m.
+1. **Thick wall ("Vorwaller Metric")**: a smooth cosine wall profile, widened from 1 m to 1000 m.
 2. **Pulsed design** (earlier, now superseded): microsecond on/off bursts.
 3. **Dual-shell always-on design** (current): two nested shells driven by cosine and sine so the bubble never switches off.
 
@@ -50,7 +50,7 @@ r_s = sqrt( (x − x_s(t))² + y² + z² )
 f(r_s) = [ tanh(σ(r_s + R)) − tanh(σ(r_s − R)) ] / ( 2 tanh(σR) )
 ```
 
-### The author's cosine wall
+### The author's cosine wall ("Vorwaller Metric")
 
 ```
 f = 1                                   for r_s < R
@@ -108,6 +108,10 @@ Numerically integrate T⁰⁰ over all space (the problem is axisymmetric, so cy
 
 **Key question:** does total energy fall as 1/Δ² (the author's estimate) or roughly as 1/Δ? Pfenning & Ford give total energy ∝ R²/Δ for thin walls: energy *density* drops as 1/Δ², but wall *volume* grows as Δ. Show the log-log plot with the slope labeled, and explain the result in two plain sentences.
 
+### Task 2b — Quantum-inequality check (added 2026-11-17)
+
+*Added by Claude Code with the owner's approval; it was missing from the original task list.* The spec names the Ford–Roman quantum inequalities as the key obstacle, and the author's notes include `|ρ| · τ⁴ ≤ constant`, but no task tested them. Apply the QI to the cosine wall: the strongest negative energy density, the curvature-limited sampling time (P&F section 3), the Lorentzian-sampled energy along a real geodesic, and the violation factor vs wall thickness. Show how the result depends on the sampling fraction α and the speed. State the assumptions honestly: a free scalar field, flat-space QI over windows shorter than the curvature time.
+
 ### Task 3 — Dual-shell model
 
 Implement `f_total(r_s, t)` exactly as written, and plot it versus r_s at several times across one cycle.
@@ -125,11 +129,13 @@ Animate the dual-shell bubble across one or two cycles, as a 2D cross-section wi
 
 ### Task 5 — Physics caveat to check
 
-The T⁰⁰ formula above assumes a **steady** bubble (constant v_s, time-independent f). The author's designs are time-dependent at GHz rates, so time-derivative terms of f will add to the stress-energy. Either compute the full Einstein tensor numerically (this is what WarpFactory does) or clearly note that the simple formula underestimates or misses these terms.
+~~The T⁰⁰ formula above assumes a steady bubble … time-derivative terms of f will add to the stress-energy.~~
+
+*Revised 2026-11-17 by Claude Code.* The original premise is only half right. For this metric family (flat spatial slices, unit lapse) the energy density the Eulerian observers see, G_0̂0̂/8π = −(S_y² + S_z²)/(32π) with S = v_s f, has **no** time-derivative terms, so the T⁰⁰ formula holds at every instant even for GHz designs (verified symbolically, `warp/curvature.py`). Time dependence does enter (a) the **stresses** (G_îĵ contains ∂_t∂_x S), (b) the **curvature**, which sets the quantum-inequality window, and (c) the **geodesics**, i.e. whether anything is actually carried along. Task 5 is therefore: compute the full Einstein tensor and curvature for the pulsed and dual-shell designs, show what time dependence changes and what it doesn't, and redo the quantum-inequality test (Task 2b) for them.
 
 ### Task 6 (phase 2) — WarpFactory
 
-Install WarpFactory (Python port preferred). Reproduce a standard Alcubierre case as a sanity check, then run the author's cosine-wall metric as a custom metric. Report energy-condition violations and energy totals, and compare them with Tasks 2–3.
+Install WarpFactory (Python port preferred). Reproduce a standard Alcubierre case as a sanity check, then run the Vorwaller Metric (cosine wall) as a custom metric. Report energy-condition violations and energy totals, and compare them with Tasks 2–3.
 
 ---
 

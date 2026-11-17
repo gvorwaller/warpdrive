@@ -2,7 +2,7 @@
 
 ## Session Startup (Required)
 1. Read `cs.md` (this file). These are hard rules that override defaults.
-2. Read `docs/warp-bubble-notebook-spec.md`. It is the authoritative spec: the author's equations, Tasks 1–6, deliverables.
+2. Read `docs/warp-bubble-notebook-spec.md`: the author's equations, Tasks 1–6, deliverables. Claude (iOS) wrote it from the author's handwritten notes, so the tasks, framing and engineering choices may be improved (record changes in the devlog). The equations themselves follow the rule below.
 3. Check recent devlog entries in `docs/devlog/`.
 4. Run `td usage --new-session` to see current tasks.
 
@@ -36,7 +36,7 @@ This is a learning project. Accuracy matters, and so does explanation.
 - Python 3, numpy, scipy, matplotlib; sympy for derivatives. Physical constants come from `scipy.constants`. Where scipy has none (e.g. solar mass), use a named constant in `warp/energy.py` that cites its official source (IAU 2015 nominal values). Never use a bare literal.
 - Compute in geometric units if convenient, but **report in SI** (m, s, kg; energy as kg-equivalent `E/c²`).
 - Floating point: `tanh(σ·r)` saturates for σ·r ≳ 20 (use stable forms or analytic derivatives). 1 GHz oscillations need enough samples per period. Check convergence: refine the grid and show that the answer holds still.
-- The simple `T⁰⁰` formula assumes a **steady** bubble. Any time-dependent design must either include the time-derivative terms (full Einstein tensor) or say clearly that the formula misses them (spec Task 5).
+- Energy density seen by the Eulerian observers is G_0̂0̂/8π = −(S_y² + S_z²)/(4·8π) for **any** shift S(t,x,y,z), including time-dependent designs (verified symbolically in `warp/curvature.py`: flat slices with unit lapse leave no ∂_t terms in it). Time dependence enters the **stresses** (G_îĵ contains ∂_t∂_x S), the curvature (and so the quantum-inequality window), and the geodesics. Use `warp/curvature.py` for those; never assume the steady-bubble results carry over.
 - Reusable math lives in an importable Python module, not only in notebook cells, so it can be tested.
 
 ## Tests
