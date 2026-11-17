@@ -1,0 +1,29 @@
+# td
+.todos/
+.sidecar/
+.sidecar-agent
+.sidecar-task
+.sidecar-pr
+.sidecar-start.sh
+.sidecar-base
+.td-root
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ipynb_checkpoints/
+*.egg-info/
+
+# OS / secrets
+.DS_Store
+.env
+.env.*
+!.env.example
+
+# Claude Code: track shared commands, ignore per-machine state (matches siblings)
+.claude/settings.local.json
+.claude/worktrees/
+
+tmp/
