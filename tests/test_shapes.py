@@ -8,6 +8,7 @@ from warp.shapes import (
     alcubierre_df,
     alcubierre_f,
     alcubierre_wall_thickness,
+    cosine_wall_ddf,
     cosine_wall_df,
     cosine_wall_f,
     cosine_wall_max_slope,
@@ -48,7 +49,7 @@ def test_alcubierre_far_tail_keeps_precision():
     """Literal tanh difference cancels to exactly 0 here; stable form keeps the true tiny value."""
     sigma, r = 2.0, 110.0  # 10 m outside, σΔr = 20
     expected = np.exp(-2.0 * sigma * (r - R)) * (1.0 - np.exp(-4.0 * sigma * R))  # leading terms
-    assert alcubierre_f(r, R, sigma) == pytest.approx(expected, rel=1e-9)
+    assert alcubierre_f(r, R, sigma) == pytest.approx(expected, rel=1e-9, abs=0)
 
 
 @pytest.mark.parametrize("sigma", [0.2, 2.0])
@@ -207,3 +208,22 @@ def test_pf_ramp_shape_and_slope(delta):
     fd = _finite_diff(lambda x: pf_ramp_f(x, R, delta), r[inner], delta * 1e-6)
     np.testing.assert_allclose(pf_ramp_df(r[inner], R, delta), fd, rtol=1e-6)
     assert np.all(pf_ramp_df(r[np.abs(r - R) > 0.51 * delta], R, delta) == 0.0)
+
+
+# ------------------------------------------------- regressions from the Codex review (CODEX8)
+
+def test_cosine_edges_exact_for_non_binary_width():
+    """r = R+Δ must count as inside the wall even when (R+Δ-R)/Δ rounds above 1."""
+    d = 0.01
+    edge = R + d
+    assert cosine_wall_ddf(edge, R, d) == pytest.approx(np.pi**2 / (2 * d**2), rel=1e-12)
+    assert cosine_wall_ddf(np.nextafter(edge, np.inf), R, d) == 0.0
+    assert cosine_wall_ddf(np.nextafter(R, -np.inf), R, d) == 0.0
+    assert cosine_wall_df(edge, R, d) == 0.0 and cosine_wall_df(R, R, d) == 0.0
+    assert cosine_wall_f(edge, R, d) == pytest.approx(0.0, abs=1e-15)
+
+
+def test_alcubierre_broad_wall_is_stable():
+    assert alcubierre_f(0.0, R, 1e-18) == pytest.approx(1.0, rel=1e-12)
+    s = sigma_for_wall_thickness(1e29, R)
+    assert alcubierre_wall_thickness(R, s) == pytest.approx(1e29, rel=1e-10)

@@ -183,3 +183,73 @@ def test_worldline_curvature_is_smaller_than_global():
     assert w.violation > g.violation
     # largest component on the path vs P&F eq. 18's (3/4)(π/2)²: ≈ 1.32
     assert 1 / w.r_min**2 / (0.75 * (np.pi / 2) ** 2) == pytest.approx(1.32, abs=0.01)
+
+
+# ------------------------------------------------- regressions from the Codex review (CODEX8)
+
+def test_sampled_density_is_symmetric_under_reversing_travel():
+    f, df, _ = cos_funcs(1.0)
+    a = q.sampled_energy_density(1.0, f, df, R + 0.5, 0.045, R + 1.0)
+    b = q.sampled_energy_density(-1.0, f, df, R + 0.5, 0.045, R + 1.0)
+    assert a < 0 and b == pytest.approx(a, rel=1e-9)
+
+
+def test_sampled_density_edge_cases():
+    f, df, _ = cos_funcs(1.0)
+    assert q.sampled_energy_density(0.0, f, df, R + 0.5, 0.045, R + 1.0) == 0.0
+    # inside the flat interior the observer co-moves with the bubble: constant (zero) density, no hang
+    assert q.sampled_energy_density(1.0, f, df, 99.0, 0.045, R + 1.0) == 0.0
+    with pytest.raises(ValueError):
+        q.sampled_energy_density(1.0, f, df, R + 0.5, 0.0, R + 1.0)
+
+
+def test_max_curvature_resolves_a_very_sharp_wall():
+    """σ = 200/m (5 mm wall) off the coarse grid: must match a brute-force scan (12324.68/m²)."""
+    Rt, s = 100.025, 200.0
+    fa = lambda r: shapes.alcubierre_f(r, Rt, s)
+    dfa = lambda r: shapes.alcubierre_df(r, Rt, s)
+    ddfa = lambda r: shapes.alcubierre_ddf(r, Rt, s)
+    best = 0.0
+    for th in np.linspace(0, np.pi, 91):
+        r = np.linspace(Rt - 0.05, Rt + 0.05, 10_001)
+        S, dS, ddS = cv.steady_bubble_derivatives(0, r * np.cos(th), r * np.sin(th), 0 * r, 1.0, fa, dfa, ddfa)
+        best = max(best, float(cv.max_riemann(S, dS, ddS).max()))
+    got = q.max_frame_curvature(1.0, fa, dfa, ddfa, 80.0, 120.0)
+    assert got >= best * (1 - 1e-6)
+    assert got == pytest.approx(best, rel=1e-4)
+
+
+def test_tensors_broadcast_over_hessian_only_batches():
+    dd = np.zeros((4, 4, 3))
+    dd[0, 1] = dd[1, 0] = [0.0, 1.0, 2.0]
+    comps = cv.riemann_frame(0.0, np.zeros(4), dd)
+    assert comps[(0, 1, 0, 1)].shape == (3,)
+    assert cv.einstein_frame(0.0, np.zeros(4), dd)[(0, 0)].shape == (3,)
+
+
+def test_curvature_at_the_centre():
+    """Smooth radial f: centre is the limit of nearby points; flat-core cosine wall is exactly flat (CODEX8)."""
+    f, df, ddf = cos_funcs(1.0)
+    S, dS, ddS = cv.steady_bubble_derivatives(0.0, 0.0, 0.0, 0.0, 1.0, f, df, ddf)
+    assert float(cv.max_riemann(S, dS, ddS)) == 0.0
+    sig = 0.05                                   # broad tanh: f''(0) ≠ 0
+    ft, dft, ddft = (lambda r: shapes.alcubierre_f(r, 20.0, sig), lambda r: shapes.alcubierre_df(r, 20.0, sig),
+                     lambda r: shapes.alcubierre_ddf(r, 20.0, sig))
+    at0 = cv.riemann_frame(*cv.steady_bubble_derivatives(0.0, 0.0, 0.0, 0.0, 1.0, ft, dft, ddft))
+    near = cv.riemann_frame(*cv.steady_bubble_derivatives(0.0, 1e-6, 0.0, 0.0, 1.0, ft, dft, ddft))
+    for k in at0:
+        assert float(at0[k]) == pytest.approx(float(near[k]), rel=1e-6, abs=1e-14)
+
+
+def test_sampled_density_against_independent_distance_integral():
+    """Integrate over the observer's comoving distance X instead of time: an independent route."""
+    from scipy.integrate import cumulative_trapezoid
+    f, df, _ = cos_funcs(1.0)
+    rho0, tau, beta = R + 0.5, 0.045, 1.0
+    x_exit = np.sqrt((R + 1.0) ** 2 - rho0**2)
+    X = np.linspace(0.0, x_exit, 400_001)
+    speed = beta * (1 - f(np.hypot(X, rho0)))            # |dX/dt|
+    t = cumulative_trapezoid(1.0 / speed, X, initial=0.0)
+    rho = q.energy.energy_density(X, rho0, df, beta)
+    indep = 2 * tau / np.pi * np.trapezoid(rho / (t**2 + tau**2) / speed, X)
+    assert q.sampled_energy_density(beta, f, df, rho0, tau, R + 1.0) == pytest.approx(indep, rel=1e-6)

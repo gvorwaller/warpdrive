@@ -68,3 +68,9 @@ def test_energy_density_on_axis_and_centre_is_zero():
     rho_e = energy.energy_density(np.array([0.0, 50.0, 100.5]), np.array([0.0, 0.0, 0.0]), cos_df(1.0), 1.0)
     assert np.all(rho_e == 0.0)
     assert energy.energy_density(0.0, 100.5, cos_df(1.0), 1.0) < 0.0
+
+
+def test_unresolvably_thin_wall_raises():
+    """Δ = 1e-14 m at r = 100 m is below float resolution: refuse rather than return 0 (CODEX8)."""
+    with pytest.raises(ValueError):
+        energy.wall_integral(cos_df(1e-14), R, R + 1e-14)

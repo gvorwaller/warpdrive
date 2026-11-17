@@ -109,16 +109,18 @@ def _args(S, dS, ddS):
 def riemann_frame(S, dS, ddS):
     """All independent Eulerian-frame Riemann components R_âb̂ĉd̂ (1/m²) as {(a,b,c,d): array}."""
     keys, fun, *_ = _symbolic()
-    vals = fun(*_args(S, dS, ddS))
-    shape = np.broadcast(S, *dS).shape
+    args = _args(S, dS, ddS)
+    vals = fun(*args)
+    shape = np.broadcast(*[np.asarray(a) for a in args]).shape
     return {k: np.broadcast_to(np.asarray(v, dtype=float), shape) for k, v in zip(keys, vals)}
 
 
 def einstein_frame(S, dS, ddS):
     """Eulerian-frame Einstein tensor G_âb̂ (1/m²) as {(a,b): array}, a <= b."""
     _, _, keys, fun, *_ = _symbolic()
-    vals = fun(*_args(S, dS, ddS))
-    shape = np.broadcast(S, *dS).shape
+    args = _args(S, dS, ddS)
+    vals = fun(*args)
+    shape = np.broadcast(*[np.asarray(a) for a in args]).shape
     return {k: np.broadcast_to(np.asarray(v, dtype=float), shape) for k, v in zip(keys, vals)}
 
 
@@ -141,10 +143,13 @@ def steady_bubble_derivatives(t, x, y, z, beta, f, df, ddf):
     z = np.asarray(z, dtype=float)
     X, y, z = np.broadcast_arrays(X, y, z)
     r = np.sqrt(X * X + y * y + z * z)
-    if np.any(r == 0):
-        raise ValueError("curvature evaluation at the bubble centre r_s = 0 is not supported")
-    n = np.stack([X / r, y / r, z / r])                      # unit vector, spatial
+    centre = r == 0
+    if np.any(centre) and abs(float(df(0.0))) > 0:
+        raise ValueError("f'(0) ≠ 0: the shape has a kink at the bubble centre, so curvature is undefined there")
+    r_safe = np.where(centre, 1.0, r)
+    n = np.stack([X / r_safe, y / r_safe, z / r_safe])       # unit vector, spatial (0 at the centre)
     f0, f1, f2 = f(r), df(r), ddf(r)
+    r = r_safe
 
     # spatial first and second derivatives of r
     dr_sp = n
@@ -161,4 +166,9 @@ def steady_bubble_derivatives(t, x, y, z, beta, f, df, ddf):
     S = beta * f0
     dS = beta * f1 * dr
     ddS = beta * (f2 * np.einsum("a...,b...->ab...", dr, dr) + f1 * ddr)
+    if np.any(centre):
+        # smooth radial f with f'(0) = 0: ∇S = 0 and spatial Hessian β f''(0) I, then the same time lift
+        dS = np.where(centre, 0.0, dS)
+        hess = beta * float(ddf(0.0)) * (lift @ lift.T)
+        ddS = np.where(centre, hess.reshape((4, 4) + (1,) * centre.ndim), ddS)
     return S, dS, ddS

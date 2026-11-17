@@ -19,7 +19,10 @@ Both routes are implemented: total_mass_cylindrical() integrates the full 2-D
 energy density as the spec asks; wall_integral() is the 1-D reduction. They are
 independent cross-checks of each other.
 
-Only valid for a STEADY bubble (constant v_s, time-independent f). See spec Task 5.
+For this metric family (flat slices, unit lapse) the energy density has no time
+derivatives, so these formulas hold at every instant even when v_s or f change in
+time (see warp.curvature). Time dependence affects the stresses and curvature, which
+are not computed here.
 """
 
 from __future__ import annotations
@@ -65,6 +68,10 @@ def _achievable_rtol(requested, r_lo, r_hi):
     makes it chase roundoff noise (IntegrationWarning) without improving the answer.
     """
     floor = 100.0 * np.finfo(float).eps * r_hi / (r_hi - r_lo)
+    if floor > 1e-4:
+        raise ValueError(
+            f"wall [{r_lo!r}, {r_hi!r}] is too thin to integrate in absolute coordinates "
+            f"(only ~{floor:.0e} relative precision); use a closed form or wall-local coordinates")
     return max(requested, floor)
 
 

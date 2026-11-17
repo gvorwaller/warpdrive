@@ -50,18 +50,57 @@ def allowed_duration(rho_abs):
     return (QI_CONSTANT / np.asarray(rho_abs, dtype=float)) ** 0.25
 
 
-def max_frame_curvature(beta, f, df, ddf, r_lo, r_hi, n_r=801, n_theta=721):
+def max_frame_curvature(beta, f, df, ddf, r_lo, r_hi, n_r=801, n_theta=721, n_fine=200_001, refine=True):
     """Largest |R_âb̂ĉd̂| (1/m²) over the wall shell r_lo ≤ r ≤ r_hi, all directions.
 
-    Scans a polar grid (r, θ) in a plane through the line of travel; the bubble is
-    axially symmetric, so this covers every point of the wall.
+    The bubble is axially symmetric, so a polar grid (r, θ) in one plane through the
+    line of travel covers every point of the wall. The radial grid is built to resolve
+    the profile: a fine 1-D pass (n_fine points) finds the region where f', f'' are
+    non-negligible and their length scale, and that region gets ≥ 40 points per scale.
+    The best grid points are then refined with a bounded local optimiser. Walls with
+    features finer than (r_hi - r_lo)/n_fine need a larger n_fine.
     """
-    r = np.linspace(r_lo, r_hi, n_r)
+    rf = np.linspace(r_lo, r_hi, n_fine)
+    a = np.abs(df(rf))
+    b = np.abs(ddf(rf))
+    a_max, b_max = float(a.max()), float(b.max())
+    scale = 1.0 / max(a_max, np.sqrt(b_max), 1.0 / (r_hi - r_lo))
+    active = (a > 1e-10 * a_max) | (b > 1e-10 * b_max) if a_max > 0 or b_max > 0 else np.zeros_like(a, bool)
+    pieces = [np.linspace(r_lo, r_hi, n_r), [rf[np.argmax(a)], rf[np.argmax(b)]]]
+    if active.any():
+        step = rf[1] - rf[0]
+        lo_a = max(r_lo, rf[active].min() - step)
+        hi_a = min(r_hi, rf[active].max() + step)
+        n_a = int(min(max((hi_a - lo_a) / (scale / 40.0), 2), 40_001))
+        pieces.append(np.linspace(lo_a, hi_a, n_a))
+    r = np.unique(np.concatenate([np.atleast_1d(p_) for p_ in pieces]))
     th = np.linspace(0.0, np.pi, n_theta)
-    rr, tt = np.meshgrid(r, th)
-    S, dS, ddS = curvature.steady_bubble_derivatives(
-        0.0, rr * np.cos(tt), rr * np.sin(tt), np.zeros_like(rr), beta, f, df, ddf)
-    return float(np.max(curvature.max_riemann(S, dS, ddS)))
+
+    def m_at(rr, tt):
+        S, dS, ddS = curvature.steady_bubble_derivatives(
+            0.0, rr * np.cos(tt), rr * np.sin(tt), np.zeros_like(rr), beta, f, df, ddf)
+        return curvature.max_riemann(S, dS, ddS)
+
+    best_val = np.full(len(th), -np.inf)
+    best_r = np.zeros(len(th))
+    chunk = max(1, 2_000_000 // len(r))              # bound memory: ~2M points per evaluation
+    for i in range(0, len(th), chunk):
+        tt, rr = np.meshgrid(th[i:i + chunk], r, indexing="ij")
+        m = m_at(rr, tt)
+        j = np.argmax(m, axis=1)
+        best_val[i:i + chunk] = m[np.arange(m.shape[0]), j]
+        best_r[i:i + chunk] = r[j]
+    result = float(best_val.max())
+
+    if refine:
+        from scipy.optimize import minimize
+        for k in np.argsort(best_val)[-6:]:
+            x0 = [best_r[k], th[k]]
+            res = minimize(lambda p_: -float(m_at(np.array(p_[0]), np.array(p_[1]))), x0,
+                           method="Nelder-Mead", bounds=[(r_lo, r_hi), (0.0, np.pi)],
+                           options={"xatol": scale * 1e-6, "fatol": 0.0, "maxiter": 2000})
+            result = max(result, -float(res.fun))
+    return result
 
 
 def worldline_max_curvature(beta, f, df, ddf, rho0, r_hi, n=20_001):
@@ -81,32 +120,51 @@ def worldline_max_curvature(beta, f, df, ddf, rho0, r_hi, n=20_001):
 def sampled_energy_density(beta, f, df, rho0, tau_m, r_hi):
     """Lorentzian-sampled energy density (J/m³) along a geodesic Eulerian observer.
 
-    The observer sits at distance rho0 from the line of travel and crosses the
+    qi_check uses the observer whose path crosses the point of strongest energy
+    density; that is not guaranteed to be the observer with the strongest *sampled*
+    average (for a 1000 m wall a nearby path is ~0.08% stronger), which doesn't change
+    any conclusion. The observer sits at distance rho0 from the line of travel and crosses the
     bubble's equator at t = 0. Times are in metres (t means ct); tau_m = c·τ.
     In the bubble's frame its offset X = x - x_s obeys dX/dt = -β(1 - f(r_s)).
-    The motion is symmetric in t, so we integrate t ≥ 0 and double.
+    The motion is symmetric in t, so we integrate t ≥ 0 and double. The Lorentzian
+    is resolved by substituting t = τ·tan(u), which turns the sampling integral into
+    (2/π) ∫ ρ(t(u)) du over u ∈ [0, arctan(t_exit/τ)].
     """
+    if not tau_m > 0:
+        raise ValueError("tau_m must be positive")
+    if beta == 0:
+        return 0.0
+
+    def rho_at(X):
+        return float(energy.energy_density(X, rho0, df, beta))
+
+    if rho0 >= r_hi:
+        return rho_at(0.0) if rho0 == r_hi else 0.0
+    drift = abs(beta) * (1.0 - float(f(rho0)))
+    if drift <= 1e-14 * abs(beta):
+        # co-moving with the bubble here: the observer stays at r_s = rho0 forever,
+        # so the sample is the constant value (the Lorentzian weights integrate to 1)
+        return rho_at(0.0)
+
     def rhs(t, X):
-        r = np.hypot(X[0], rho0)
-        return [-beta * (1.0 - float(f(r)))]
+        return [-beta * (1.0 - float(f(np.hypot(X[0], rho0))))]
 
     def leaves_wall(t, X):
         return np.hypot(X[0], rho0) - r_hi
     leaves_wall.terminal = True
 
-    rate = beta * max(1.0 - float(f(rho0)), 1e-12)
-    t_max = 10.0 * (np.sqrt(max(r_hi**2 - rho0**2, 0.0)) / rate + 50.0 * tau_m)
-    sol = solve_ivp(rhs, (0.0, t_max), [0.0], events=leaves_wall, dense_output=True,
-                    rtol=1e-11, atol=1e-12 * r_hi, max_step=tau_m)
-    t_end = sol.t[-1]
-
-    def integrand(t):
-        X = sol.sol(t)[0]
-        return float(energy.energy_density(X, rho0, df, beta)) / (t * t + tau_m * tau_m)
-
-    pts = [p for p in (tau_m, 10 * tau_m) if p < t_end]
-    val, _ = quad(integrand, 0.0, t_end, points=pts or None, limit=2000, epsabs=0.0, epsrel=1e-9)
-    return 2.0 * (tau_m / np.pi) * val
+    x_exit = np.sqrt(r_hi**2 - rho0**2)
+    t_max = 100.0 * x_exit / drift + 100.0 * tau_m
+    sol = solve_ivp(rhs, (0.0, t_max), [0.0], method="DOP853", events=leaves_wall,
+                    dense_output=True, rtol=1e-12, atol=1e-12 * r_hi)
+    if sol.status != 1 or len(sol.t_events[0]) == 0:
+        raise RuntimeError(f"observer did not leave the wall within t = {t_max:.3g} m "
+                           f"(solver status {sol.status}: {sol.message})")
+    t_exit = float(sol.t_events[0][0])
+    u_exit = np.arctan(t_exit / tau_m)
+    val, _ = quad(lambda u: rho_at(sol.sol(tau_m * np.tan(u))[0]), 0.0, u_exit,
+                  limit=500, epsabs=0.0, epsrel=1e-10)
+    return 2.0 / np.pi * val
 
 
 @dataclass

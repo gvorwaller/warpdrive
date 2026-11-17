@@ -89,3 +89,43 @@ def test_mass_vs_time_units():
     m = ds.mass_vs_time([0.0], 1.0, AS)[0]
     assert m == pytest.approx(-(c**2 / G) / 12 * 100.0**2 * 2.0 / 3.0, rel=2e-4)
     assert m == pytest.approx(-7.48e29, rel=1e-3)
+
+
+# ------------------------------------------------- regressions from the Codex review (CODEX8)
+
+def test_far_field_is_truly_far():
+    p = {**AS, "R1": 20_000.0, "R2": 19_000.0}
+    assert ds.relative_velocity(0.0, 1.0, p) == pytest.approx(-1.0, abs=1e-12)
+
+
+def test_cheapest_split_includes_overlap():
+    """Coincident shells act as one shell; separated shells match a direct integral of the combined slope."""
+    from warp import energy
+    from warp.shapes import shell_profile_dr
+    same = {**ds.VARIANTS["both shells face inward"], "R2": 100.0}
+    _, m_same = ds.cheapest_steady_split(same, 1.0)
+    assert m_same == pytest.approx(energy.mass_from_wall_integral(ds.single_shell_integral(100.0, 2.0), 1.0), rel=1e-9)
+    near = {**ds.VARIANTS["both shells face inward"], "R2": 99.5}     # walls overlap strongly
+    a, m = ds.cheapest_steady_split(near, 1.0)
+    direct = energy.wall_integral(lambda r: a * shell_profile_dr(r, 100.0, 2.0, -1)
+                                  + (1 - a) * shell_profile_dr(r, 99.5, 2.0, -1), 70.0, 130.0, points=[99.5, 100.0])
+    assert m == pytest.approx(energy.mass_from_wall_integral(direct, 1.0), rel=1e-8)
+
+
+@pytest.mark.parametrize("sigma", [0.01, 1e4])
+def test_single_shell_integral_any_sharpness(sigma):
+    from warp import energy
+    from warp.shapes import shell_profile_dr
+    if sigma < 1:
+        wide = energy.wall_integral(lambda r: shell_profile_dr(r, 100.0, sigma, -1), 0.0, 2500.0, points=[100.0])
+        assert ds.single_shell_integral(100.0, sigma) == pytest.approx(wide, rel=1e-8)
+    else:
+        assert ds.single_shell_integral(100.0, sigma) == pytest.approx(100.0**2 * sigma / 3.0, rel=1e-6)
+
+
+def test_motion_is_exact_on_sparse_grids():
+    """One full cycle sampled at just its endpoints still returns exactly to the start (CODEX8)."""
+    assert ds.relative_displacement(np.array([0.0, T]), 1.0, AS)[-1] == pytest.approx(0.0, abs=1e-15)
+    sq = ds.VARIANTS["inward + squared drive"]
+    assert ds.relative_displacement(np.array([0.0, T]), 1.0, sq)[-1] == pytest.approx(c * T, rel=1e-12)
+    assert ds.mean_relative_velocity(1.0, sq) == pytest.approx(1.0, abs=1e-12)

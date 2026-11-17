@@ -5,9 +5,11 @@ and returns a plain numpy array. The author's formulas are implemented exactly a
 written in docs/warp-bubble-notebook-spec.md; alternatives are separate,
 explicitly named options, never silent substitutions.
 
-Numerical note: ½[1 ± tanh(x)] is computed as the logistic function expit(±2x),
+Numerical notes: ½[1 ± tanh(x)] is computed as the logistic function expit(±2x),
 which is mathematically identical but never overflows and keeps full relative
 precision in the far tails (where 1 - tanh(x) would cancel to exactly 0).
+Alcubierre's f uses the exact form cosh²(σR)/(cosh(σ(r+R)) cosh(σ(r-R))) in log
+space, which is stable for both sharp and very broad walls.
 """
 
 from __future__ import annotations
@@ -48,32 +50,43 @@ def _sech2(x):
 #   f = [tanh(σ(r+R)) - tanh(σ(r-R))] / (2 tanh(σR))
 # ---------------------------------------------------------------------------
 
+def _logcosh(x):
+    """log(cosh x), stable for any x: |x| + log1p(e^(-2|x|)) - log 2."""
+    ax = np.abs(np.asarray(x, dtype=float))
+    with np.errstate(under="ignore"):          # e^(-2|x|) → 0 is the exact limit
+        return ax + np.log1p(np.exp(-2.0 * ax)) - np.log(2.0)
+
+
 def alcubierre_f(r, R, sigma):
     """Alcubierre's tanh shape function.
 
-    Uses tanh(a) - tanh(b) = 2[expit(-2b) - expit(-2a)], which keeps relative
-    precision for r >> R (both tanh terms -> 1 there).
+    Exact rewrite: tanh(a) - tanh(b) = sinh(a-b)/(cosh a cosh b) with a - b = 2σR, and
+    sinh(2x)/(2 tanh x) = cosh²x, so f = cosh²(σR) / (cosh(σ(r+R)) cosh(σ(r-R))).
+    Evaluated in log space, it keeps full relative precision for sharp walls (far
+    tails) and broad walls (σR ≪ 1, where the tanh difference would cancel).
     """
     r = np.asarray(r, dtype=float)
     a = sigma * (r + R)
     b = sigma * (r - R)
-    return (expit(-2.0 * b) - expit(-2.0 * a)) / np.tanh(sigma * R)
+    with np.errstate(under="ignore"):          # far tails below 1e-308 are exactly 0 in float
+        return np.exp(2.0 * _logcosh(sigma * R) - _logcosh(a) - _logcosh(b))
 
 
 def alcubierre_df(r, R, sigma):
-    """d f / d r_s for Alcubierre's shape (negative for r_s > 0)."""
-    r = np.asarray(r, dtype=float)
-    return sigma * (_sech2(sigma * (r + R)) - _sech2(sigma * (r - R))) / (
-        2.0 * np.tanh(sigma * R)
-    )
-
-
-def alcubierre_ddf(r, R, sigma):
-    """d²f/dr_s² for Alcubierre's shape. Uses d/dx sech²(x) = -2 sech²(x) tanh(x)."""
+    """d f / d r_s = -σ f (tanh a + tanh b), a = σ(r+R), b = σ(r-R) (negative for r_s > 0)."""
     r = np.asarray(r, dtype=float)
     a = sigma * (r + R)
     b = sigma * (r - R)
-    return sigma**2 * (_sech2(b) * np.tanh(b) - _sech2(a) * np.tanh(a)) / np.tanh(sigma * R)
+    return -sigma * alcubierre_f(r, R, sigma) * (np.tanh(a) + np.tanh(b))
+
+
+def alcubierre_ddf(r, R, sigma):
+    """d²f/dr_s² = σ² f [(tanh a + tanh b)² - sech²a - sech²b]."""
+    r = np.asarray(r, dtype=float)
+    a = sigma * (r + R)
+    b = sigma * (r - R)
+    ta, tb = np.tanh(a), np.tanh(b)
+    return sigma**2 * alcubierre_f(r, R, sigma) * ((ta + tb) ** 2 - _sech2(a) - _sech2(b))
 
 
 def alcubierre_wall_thickness(R, sigma):
@@ -95,10 +108,12 @@ def sigma_for_wall_thickness(delta, R):
     if delta <= 0 or R <= 0:
         raise ValueError("delta and R must be positive")
     # Two limits of eq. 5: σR >> 1 gives Δ ≈ 2/σ; σR << 1 gives Δ ≈ 1/(2σ²R).
-    # Bracket both estimates generously so any positive Δ is found.
+    # Solve in log σ (relative accuracy at any scale), bracketing both estimates.
     large, small = 2.0 / delta, 1.0 / np.sqrt(2.0 * delta * R)
-    lo, hi = min(large, small) / 100.0, max(large, small) * 100.0
-    return brentq(lambda s: alcubierre_wall_thickness(R, s) - delta, lo, hi, xtol=1e-14, rtol=1e-14)
+    lo, hi = np.log(min(large, small) / 100.0), np.log(max(large, small) * 100.0)
+    ls = brentq(lambda x: np.log(alcubierre_wall_thickness(R, np.exp(x))) - np.log(delta), lo, hi,
+                xtol=1e-15, rtol=4 * np.finfo(float).eps)
+    return float(np.exp(ls))
 
 
 # ---------------------------------------------------------------------------
@@ -114,12 +129,23 @@ def _check_delta(delta):
         raise ValueError("wall thickness delta must be positive")
 
 
+def _cosine_wall_coords(r, R, delta):
+    """u = (r-R)/Δ clipped to [0, 1], plus masks against the *represented* endpoints R and R+Δ.
+
+    Comparing r with R and R+Δ directly (not u with 0 and 1) keeps r = R+Δ inside the
+    wall even when (R+Δ-R)/Δ rounds to slightly above 1.
+    """
+    r = np.asarray(r, dtype=float)
+    hi = R + delta
+    u = np.clip((r - R) / delta, 0.0, 1.0)
+    return r, u, r < R, r > hi
+
+
 def cosine_wall_f(r, R, delta):
     _check_delta(delta)
-    r = np.asarray(r, dtype=float)
-    u = (r - R) / delta
-    inside_wall = 0.5 * (1.0 + np.cos(np.pi * np.clip(u, 0.0, 1.0)))
-    return np.where(u < 0.0, 1.0, np.where(u > 1.0, 0.0, inside_wall))
+    r, u, below, above = _cosine_wall_coords(r, R, delta)
+    inside_wall = 0.5 * (1.0 + np.cos(np.pi * u))
+    return np.where(below, 1.0, np.where(above, 0.0, inside_wall))
 
 
 def cosine_wall_df(r, R, delta):
@@ -130,10 +156,10 @@ def cosine_wall_df(r, R, delta):
     but anything using second derivatives (full Einstein tensor) will see edge spikes.
     """
     _check_delta(delta)
-    r = np.asarray(r, dtype=float)
-    u = (r - R) / delta
-    in_wall = (u >= 0.0) & (u <= 1.0)
-    return np.where(in_wall, -(np.pi / (2.0 * delta)) * np.sin(np.pi * np.clip(u, 0.0, 1.0)), 0.0)
+    r, u, below, above = _cosine_wall_coords(r, R, delta)
+    slope = -(np.pi / (2.0 * delta)) * np.sin(np.pi * u)
+    slope = np.where((u == 0.0) | (u == 1.0), 0.0, slope)   # exact zeros at the edges
+    return np.where(below | above, 0.0, slope)
 
 
 def cosine_wall_ddf(r, R, delta):
@@ -143,10 +169,8 @@ def cosine_wall_ddf(r, R, delta):
     At exactly r = R or R + Δ this returns the inside-wall value.
     """
     _check_delta(delta)
-    r = np.asarray(r, dtype=float)
-    u = (r - R) / delta
-    in_wall = (u >= 0.0) & (u <= 1.0)
-    return np.where(in_wall, -(np.pi**2 / (2.0 * delta**2)) * np.cos(np.pi * np.clip(u, 0.0, 1.0)), 0.0)
+    r, u, below, above = _cosine_wall_coords(r, R, delta)
+    return np.where(below | above, 0.0, -(np.pi**2 / (2.0 * delta**2)) * np.cos(np.pi * u))
 
 
 def cosine_wall_max_slope(delta):
