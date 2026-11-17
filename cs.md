@@ -33,7 +33,7 @@ This is a learning project. Accuracy matters, and so does explanation.
 ---
 
 ## Physics & Numerics
-- Python 3, numpy, scipy, matplotlib; sympy for derivatives. Physical constants come from `scipy.constants`, never typed in by hand.
+- Python 3, numpy, scipy, matplotlib; sympy for derivatives. Physical constants come from `scipy.constants`. Where scipy has none (e.g. solar mass), use a named constant in `warp/energy.py` that cites its official source (IAU 2015 nominal values). Never use a bare literal.
 - Compute in geometric units if convenient, but **report in SI** (m, s, kg; energy as kg-equivalent `E/c²`).
 - Floating point: `tanh(σ·r)` saturates for σ·r ≳ 20 (use stable forms or analytic derivatives). 1 GHz oscillations need enough samples per period. Check convergence: refine the grid and show that the answer holds still.
 - The simple `T⁰⁰` formula assumes a **steady** bubble. Any time-dependent design must either include the time-derivative terms (full Einstein tensor) or say clearly that the formula misses them (spec Task 5).

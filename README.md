@@ -6,7 +6,7 @@ dual-shell always-on design. Each chart comes with a plain-English caption.
 
 The full spec is in [`docs/warp-bubble-notebook-spec.md`](docs/warp-bubble-notebook-spec.md).
 
-> **Status:** repo scaffolded 2026-11-17. The notebook, figures and summary PDF are not built yet.
+> **Status (2026-11-17):** Sections 1 (wall shapes) and 2 (energy vs wall thickness) are done. Sections 3–6 and `summary.pdf` are still to come.
 
 ## Setup
 
@@ -22,6 +22,14 @@ python3 -m venv .venv
 .venv/bin/jupyter nbconvert --to notebook --execute --inplace warp_bubble.ipynb      # regenerate everything
 .venv/bin/pytest                                                                     # shape-function tests
 ```
+
+## Layout
+
+- `warp_bubble.ipynb`: the notebook. Each section explains itself in plain English.
+- `warp/shapes.py`: the bubble shape functions (Alcubierre, the author's cosine wall, dual shell).
+- `warp/energy.py`: total negative energy of a steady bubble, in SI units.
+- `warp/plotting.py`: phone-readable figure style; draws each caption into its PNG.
+- `tests/`: checks for every shape function (`.venv/bin/pytest`).
 
 ## Outputs
 

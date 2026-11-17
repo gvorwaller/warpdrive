@@ -26,6 +26,19 @@ author (who reads results as phone images and printed PDFs).
 - Phase 2 (Task 6) adds a WarpFactory Python port. Check which port is maintained
   before choosing one, and record the choice in the devlog.
 
+## Code layout
+
+- Physics lives in `warp/` (importable and tested); notebook cells stay thin: parameters, plot, caption.
+- `warp/shapes.py`: f and df/dr_s for each shape. `½[1 ± tanh x]` is computed as `expit(±2x)`
+  (identical math, no overflow, keeps the far tails accurate).
+- `warp/energy.py`: SI energy density, total energy as mass E/c² (full 2-D cylindrical integral and
+  the 1-D P&F eq. 26 reduction), closed form and optimum for the cosine wall, IAU mass constants.
+  Steady bubble only.
+- `warp/plotting.py`: `use_phone_style()`, `phone_figure()`, `save_figure(fig, name, caption)`, `sci_text()`.
+  The caption is drawn into the PNG because figures are viewed without the notebook text.
+- `tests/`: pytest with `filterwarnings = error`, so any numpy overflow fails the suite.
+- Wall-thickness yardstick for tanh walls: Pfenning & Ford eq. 5, Δ ≈ 2/σ (1 m ↔ σ = 2/m).
+
 ## Deliverables (from the spec)
 
 1. `warp_bubble.ipynb`. Each section opens with a 2–3 sentence plain-English explanation.
