@@ -40,6 +40,8 @@ author (who reads results as phone images and printed PDFs).
   and evaluated numerically in the Eulerian orthonormal frame. Reuse it for the time-dependent designs (Task 5).
 - `warp/quantum.py`: Ford–Roman quantum inequality applied to a wall (full-curvature r_min, Lorentzian
   sampling along the real geodesic). Choices deliberately favour the design.
+- `warp/dual_shell.py`: dual-shell variants (as written + alternatives), ship motion vs distant space,
+  energy vs time.
 - `warp/plotting.py`: `use_phone_style()`, `phone_figure()`, `save_figure(fig, name, caption)`, `sci_text()`.
   The caption is drawn into the PNG because figures are viewed without the notebook text.
 - `tests/`: pytest with `filterwarnings = error`, so any numpy overflow fails the suite.

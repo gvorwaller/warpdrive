@@ -6,7 +6,7 @@ dual-shell always-on design. Each chart comes with a plain-English caption.
 
 The full spec is in [`docs/warp-bubble-notebook-spec.md`](docs/warp-bubble-notebook-spec.md).
 
-> **Status (2026-11-17):** Sections 1 (wall shapes), 2 (energy vs wall thickness) and 3 (quantum inequality) are done. The dual-shell design, animation, time-dependent energy, WarpFactory comparison and `summary.pdf` are still to come.
+> **Status (2026-11-17):** Sections 1 (wall shapes), 2 (energy vs wall thickness), 3 (quantum inequality) and 4 (dual-shell design) are done. The animation, time-dependent stresses and curvature, the WarpFactory comparison and `summary.pdf` are still to come.
 
 ## Setup
 
@@ -29,6 +29,7 @@ python3 -m venv .venv
 - `warp/shapes.py`: the bubble shape functions (Alcubierre, the author's cosine wall, dual shell).
 - `warp/energy.py`: total negative energy of a steady bubble, in SI units.
 - `warp/curvature.py`, `warp/quantum.py`: space-time curvature, and the quantum-inequality test.
+- `warp/dual_shell.py`: the dual-shell design and its alternatives.
 - `warp/plotting.py`: phone-readable figure style; draws each caption into its PNG.
 - `tests/`: checks for every shape function (`.venv/bin/pytest`).
 

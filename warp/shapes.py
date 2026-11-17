@@ -188,6 +188,8 @@ def pf_ramp_df(r, R, delta):
 #   shell k profile  = ½[1 + s_k tanh(σ(r - R_k))]   (s_k = +1 rises outward, -1 falls outward)
 #   shell 1 time     = cos(ωt)
 #   shell 2 time     = cos(ωt - φ)                   (φ = 90° gives sin(ωt), as written)
+#   drive            = "linear" (as written) or "squared": time factors cos²(ωt), cos²(ωt - φ),
+#                      which never go negative and sum to 1 at φ = 90° (an "always on" alternative)
 # ---------------------------------------------------------------------------
 
 DUAL_SHELL_AS_WRITTEN = dict(
@@ -198,6 +200,7 @@ DUAL_SHELL_AS_WRITTEN = dict(
     shell1_sign=+1,
     shell2_sign=-1,
     phase=np.pi / 2.0,
+    drive="linear",
 )
 
 
@@ -217,27 +220,31 @@ def shell_profile_dr(r, R, sigma, sign):
     return 0.5 * sign * sigma * _sech2(sigma * (r - R))
 
 
-def _time_factors(t, omega, phase):
+def _time_factors(t, omega, phase, drive):
     t = np.asarray(t, dtype=float)
     wt = omega * t
     c1 = np.cos(wt)
     # Use sin directly for the as-written 90° case so it matches the author's formula bit-for-bit.
     c2 = np.sin(wt) if phase == np.pi / 2.0 else np.cos(wt - phase)
-    return c1, c2
+    if drive == "linear":
+        return c1, c2
+    if drive == "squared":
+        return c1 * c1, c2 * c2
+    raise ValueError("drive must be 'linear' or 'squared'")
 
 
-def dual_shell_f(r, t, *, R1, R2, sigma, omega, shell1_sign, shell2_sign, phase):
+def dual_shell_f(r, t, *, R1, R2, sigma, omega, shell1_sign, shell2_sign, phase, drive="linear"):
     """f_total(r_s, t). r and t broadcast against each other (numpy rules).
 
     Call with **DUAL_SHELL_AS_WRITTEN for the author's formula exactly as written.
     """
-    c1, c2 = _time_factors(t, omega, phase)
+    c1, c2 = _time_factors(t, omega, phase, drive)
     return shell_profile(r, R1, sigma, shell1_sign) * c1 + shell_profile(r, R2, sigma, shell2_sign) * c2
 
 
-def dual_shell_df(r, t, *, R1, R2, sigma, omega, shell1_sign, shell2_sign, phase):
+def dual_shell_df(r, t, *, R1, R2, sigma, omega, shell1_sign, shell2_sign, phase, drive="linear"):
     """∂f_total/∂r_s at fixed t."""
-    c1, c2 = _time_factors(t, omega, phase)
+    c1, c2 = _time_factors(t, omega, phase, drive)
     return (
         shell_profile_dr(r, R1, sigma, shell1_sign) * c1
         + shell_profile_dr(r, R2, sigma, shell2_sign) * c2
