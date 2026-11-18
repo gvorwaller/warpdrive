@@ -33,6 +33,8 @@ __all__ = [
     "pf_ramp_df",
     "shell_profile",
     "shell_profile_dr",
+    "shell_profile_drr",
+    "time_factor_derivatives",
     "dual_shell_f",
     "dual_shell_df",
     "DUAL_SHELL_AS_WRITTEN",
@@ -242,6 +244,29 @@ def shell_profile_dr(r, R, sigma, sign):
         raise ValueError("sign must be +1 or -1")
     r = np.asarray(r, dtype=float)
     return 0.5 * sign * sigma * _sech2(sigma * (r - R))
+
+
+def shell_profile_drr(r, R, sigma, sign):
+    """d²/dr² of shell_profile = -sign·σ²·sech²(σ(r - R))·tanh(σ(r - R))."""
+    if sign not in (+1, -1):
+        raise ValueError("sign must be +1 or -1")
+    r = np.asarray(r, dtype=float)
+    x = sigma * (r - R)
+    return -sign * sigma**2 * _sech2(x) * np.tanh(x)
+
+
+def time_factor_derivatives(t, omega, phase, drive):
+    """The two shells' time factors and their 1st and 2nd time derivatives (per second, per second²)."""
+    t = np.asarray(t, dtype=float)
+    w = omega
+    a1, a2 = w * t, w * t - phase
+    if drive == "linear":
+        c1, c2 = _time_factors(t, omega, phase, drive)
+        return c1, c2, -w * np.sin(a1), -w * np.sin(a2), -w * w * c1, -w * w * c2
+    if drive == "squared":
+        return (np.cos(a1) ** 2, np.cos(a2) ** 2, -w * np.sin(2 * a1), -w * np.sin(2 * a2),
+                -2 * w * w * np.cos(2 * a1), -2 * w * w * np.cos(2 * a2))
+    raise ValueError("drive must be 'linear' or 'squared'")
 
 
 def _time_factors(t, omega, phase, drive):

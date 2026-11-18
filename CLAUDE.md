@@ -42,6 +42,8 @@ author (who reads results as phone images and printed PDFs).
   sampling along the real geodesic). Choices deliberately favour the design.
 - `warp/dual_shell.py`: dual-shell variants (as written + alternatives), ship motion vs distant space,
   energy vs time.
+- `warp/time_dependent.py`: switching bubbles. S = Σ a_k(t) g_k(r) with a moving centre; exact (ct,x,y,z)
+  derivatives (checked against brute force), frozen comparison, stresses, curvature and QI vs frequency.
 - `warp/animate.py`: energy-density cross-section maps, GIF/MP4 animation and stills (fixed inch
   layout so frames match; caption drawn into every frame). Maps are checked against the 1-D totals.
 - `warp/plotting.py`: `use_phone_style()`, `phone_figure()`, `save_figure(fig, name, caption)`, `sci_text()`.
