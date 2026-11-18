@@ -10,9 +10,9 @@ to send or print. The notebook [`warp_bubble.ipynb`](warp_bubble.ipynb) has the 
 (GitHub renders it, figures included). The spec is in
 [`docs/warp-bubble-notebook-spec.md`](docs/warp-bubble-notebook-spec.md).
 
-> **Status (2026-11-17):** spec Tasks 1–5 are done, plus an added quantum-inequality task:
-> notebook Sections 1–7, `summary.pdf`, and the animation. Task 6 (cross-checking against
-> WarpFactory) is still to come.
+> **Status (2026-11-18):** all six spec tasks are done, plus an added quantum-inequality task:
+> notebook Sections 1–8, `summary.pdf`, the animation, and an independent cross-check with
+> WarpFactory, the published warp-drive toolkit.
 
 ## What's in the notebook
 
@@ -22,7 +22,8 @@ to send or print. The notebook [`warp_bubble.ipynb`](warp_bubble.ipynb) has the 
 4. **The dual-shell design:** the formula as written, plus alternatives; motion and energy over a cycle.
 5. **Animation:** the dual-shell bubble through two cycles (GIF and MP4).
 6. **Switching:** what fast switching changes (stresses, curvature, the quantum test) and what it can't (the energy).
-7. **The summary PDF.**
+7. **A second opinion:** WarpFactory, working from the bare metrics, reproduces the results to ~15 digits; its energy-condition maps.
+8. **The summary PDF.**
 
 ## Setup
 
@@ -33,12 +34,21 @@ python3 -m venv .venv
 
 The MP4 export needs `ffmpeg` on the PATH (e.g. `brew install ffmpeg`); everything else is pure Python.
 
+Section 7 also needs WarpFactory (the maintained Python port, pinned to one commit). Its package
+metadata asks for numpy < 2, but its own tests pass on numpy 2, so install it without dependencies:
+
+```sh
+uv pip install --python .venv/bin/python --no-deps -r requirements-warpfactory.txt
+```
+
+Without it, Section 7 fails and its tests are skipped; everything else still runs.
+
 ## Rerun everything
 
 ```sh
 .venv/bin/jupyter nbconvert --to notebook --execute --inplace \
     --ExecutePreprocessor.timeout=1800 warp_bubble.ipynb    # all numbers, figures, animation, summary.pdf (~1 min)
-.venv/bin/pytest                                             # 131 tests; any numpy warning counts as a failure
+.venv/bin/pytest                                             # 143 tests; any numpy warning counts as a failure
 ```
 
 For interactive exploration: `.venv/bin/jupyter lab warp_bubble.ipynb`. The settings at the
@@ -50,6 +60,8 @@ dual-shell parameters in `warp/dual_shell.py`) can be changed and the notebook r
 - Every formula was checked against the original papers: Alcubierre (1994) and Pfenning & Ford (1997).
 - Key results were computed two or three independent ways, for example the full 2-D energy integral
   vs. the 1-D reduction vs. a closed form, and the curvature engine vs. brute-force finite differences.
+- WarpFactory (Helmerich et al. 2024), given only the metrics, reproduces the paper's own Alcubierre
+  example, every total, and every stress component, including the switching dual shell, to round-off (Section 7).
 - Three independent reviewers:
   - Claude subagents reviewed each section.
   - Gemini (AGY2/AGY3) independently re-derived the physics.
@@ -66,8 +78,9 @@ dual-shell parameters in `warp/dual_shell.py`) can be changed and the notebook r
 - `warp/quantum.py`: the quantum-inequality test.
 - `warp/dual_shell.py`: the dual-shell design, its alternatives, motion and energy over time.
 - `warp/time_dependent.py`: stresses and curvature of switching bubbles.
+- `warp/warpfactory_check.py`: the WarpFactory cross-check (custom metrics, totals, energy conditions).
 - `warp/animate.py`: the dual-shell animation (GIF + MP4) and still frames.
 - `warp/plotting.py`: phone-readable figure style; draws each caption into its PNG.
-- `tests/`: 131 tests.
+- `tests/`: 143 tests (the WarpFactory ones skip if it isn't installed).
 - `figures/`: PNGs sized for a phone (each with its caption drawn in), plus the animation as GIF
   and MP4. The MP4 is much smaller and plays well in messaging apps.

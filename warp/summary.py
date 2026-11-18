@@ -67,7 +67,9 @@ def build_summary(numbers, path=None):
              intro=("These pages test the warp-drive ideas from your notes by computer. Your equations were "
                     "coded exactly as written, every number was calculated rather than estimated, and the "
                     "physics was checked against Alcubierre (1994) and Pfenning & Ford (1997), cross-checked "
-                    "several independent ways, and reviewed by three different AI systems. Where the math as "
+                    "several independent ways, and reviewed by three different AI systems. WarpFactory, the "
+                    "published toolkit that warp-drive researchers use, independently reproduced the results to "
+                    "about 15 digits. Where the math as "
                     "written has a slip, both versions are shown.")),
         dict(heading="2. The quantum rule",
              bottom_line=(f"You wrote the rule in exactly the right form: |ρ|·τ⁴ ≤ constant. Applied to a 1 m "

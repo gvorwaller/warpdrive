@@ -1,0 +1,8 @@
+# Optional: WarpFactory, for the cross-check in notebook Section 7 (spec Task 6).
+# The maintained Python port, pinned to one commit. Its metadata pins numpy < 2, but its
+# own 239 tests pass on this project's numpy 2.x, so install it WITHOUT dependencies:
+#
+#   uv pip install --python .venv/bin/python --no-deps -r requirements-warpfactory.txt
+#   (or: .venv/bin/python -m pip install --no-deps -r requirements-warpfactory.txt)
+#
+warpfactory @ git+https://github.com/JohnsterID/WarpFactory@20ffc61e21fdfa0ea47676ce71aaae3d3b6782dd

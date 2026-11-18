@@ -25,8 +25,9 @@ author (who reads results as phone images and printed PDFs).
 - Python 3 in `.venv/`, dependencies in `requirements.txt`: numpy, scipy,
   matplotlib, sympy, jupyterlab, pytest. Animation export uses matplotlib (GIF via
   pillow; MP4 needs ffmpeg).
-- Phase 2 (Task 6) adds a WarpFactory Python port. Check which port is maintained
-  before choosing one, and record the choice in the devlog.
+- Phase 2 (Task 6): WarpFactory Python port JohnsterID/WarpFactory, pinned in
+  `requirements-warpfactory.txt` and installed with `--no-deps` (its metadata pins numpy < 2; its
+  239 tests pass on numpy 2). Choice recorded in the 2026-11-18 devlog.
 
 ## Code layout
 
@@ -46,6 +47,10 @@ author (who reads results as phone images and printed PDFs).
   derivatives (checked against brute force), frozen comparison, stresses, curvature and QI vs frequency.
 - `warp/animate.py`: energy-density cross-section maps, GIF/MP4 animation and stills (fixed inch
   layout so frames match; caption drawn into every frame). Maps are checked against the 1-D totals.
+- `warp/warpfactory_check.py`: Task 6. Hands WarpFactory only the metric (custom hyper-dual metric
+  functions for the cosine wall and the dual shell; WarpFactory's own Alcubierre), then compares its
+  Eulerian stress-energy, totals and energy-condition maps with ours. Nothing from warp.curvature or
+  warp.energy is used on the WarpFactory side. Tests importorskip("warpfactory").
 - `warp/summary.py`: builds `summary.pdf` (5 Letter pages, one figure each, bottom-line text from the
   notebook's computed numbers; built by the notebook's last cell).
 - `warp/plotting.py`: `use_phone_style()`, `phone_figure()`, `save_figure(fig, name, caption)`, `sci_text()`.
@@ -65,7 +70,9 @@ author (who reads results as phone images and printed PDFs).
 - Alcubierre (1994): https://arxiv.org/abs/gr-qc/0009013
 - Pfenning & Ford (1997): https://arxiv.org/abs/gr-qc/9702026
 - Helmerich et al. (2024), Warp Factory: https://arxiv.org/abs/2404.03095
-- WarpFactory (MATLAB): https://github.com/pseudotensor/WarpFactory
+- WarpFactory (MATLAB): https://github.com/NerdsWithAttitudes/WarpFactory
+- WarpFactory Python port (used): https://github.com/JohnsterID/WarpFactory
+- Fuchs et al. (2024), subluminal warp drive satisfying all energy conditions: https://arxiv.org/abs/2405.02709
 
 ## Conventions
 
