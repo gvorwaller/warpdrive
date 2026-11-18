@@ -46,6 +46,8 @@ author (who reads results as phone images and printed PDFs).
   derivatives (checked against brute force), frozen comparison, stresses, curvature and QI vs frequency.
 - `warp/animate.py`: energy-density cross-section maps, GIF/MP4 animation and stills (fixed inch
   layout so frames match; caption drawn into every frame). Maps are checked against the 1-D totals.
+- `warp/summary.py`: builds `summary.pdf` (5 Letter pages, one figure each, bottom-line text from the
+  notebook's computed numbers; built by the notebook's last cell).
 - `warp/plotting.py`: `use_phone_style()`, `phone_figure()`, `save_figure(fig, name, caption)`, `sci_text()`.
   The caption is drawn into the PNG because figures are viewed without the notebook text.
 - `tests/`: pytest with `filterwarnings = error`, so any numpy overflow fails the suite.
