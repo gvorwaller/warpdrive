@@ -66,6 +66,8 @@ def cosine_wall_shape(r, R, delta):
 
     Written afresh here (not imported from warp.shapes). On hyper-dual input, the derivatives
     across the wall come from WarpFactory's own hyper-dual cos; outside the wall f is constant.
+    f is C¹ but not C²: f'' jumps by π²/(2Δ²) at both edges, and exactly at r = R or R + Δ the
+    wall-side value is returned (no two-sided f'' exists there; cf. warp.shapes.cosine_wall_ddf).
     """
     inside = 0.5 * (1.0 + np.cos(np.pi * (r - R) / delta))
     if not isinstance(r, HyperDual):
@@ -94,8 +96,16 @@ def dual_shell_solver(params, beta):
 
     S = β[d₁(t) g₁(r) + d₂(t) g₂(r)], g_k = ½[1 + sign_k tanh(σ(r − R_k))], drives cos(ωt) and
     cos(ωt − phase) (or their squares), r measured from the centre x_s(t), which follows the flow
-    at the centre: dx_s/dt = S(r = 0). Written afresh from the formulas, not from warp.dual_shell.
+    at the centre: dx_s/dt = S(r = 0), with x_s(0) = 0. Written afresh from the formulas, not from
+    warp.dual_shell. Needs ω > 0.
+
+    Precision note: the pinned port's hyper-dual tanh takes its derivative as 1 − tanh², so far out
+    in a shell's tail (|σ(r − R)| ≳ 18) the stress-energy rounds to exactly 0 where the true value is
+    tiny but nonzero (≲ 1e-15 of the peak). Agreement is therefore quoted relative to the largest
+    component, not pointwise in the tails.
     """
+    if not params["omega"] > 0:
+        raise ValueError("omega must be positive (the drive antiderivative divides by it)")
     k = params["omega"] / c                       # rad per metre of ct
     ph, s, drive = params["phase"], params["sigma"], params.get("drive", "linear")
     if drive not in ("linear", "squared"):
@@ -136,8 +146,9 @@ def eulerian_stress_si(solver, ct, x, y, z):
     return np.einsum("am...,ab...,bn...->mn...", M, T, M) * si_energy_factor()
 
 
-def total_mass(solver, r_lo, r_hi, splits=(), n_r=80, n_theta=80):
-    """E/c² (kg) of the Eulerian energy density at ct = 0, over the shell r_lo ≤ r ≤ r_hi.
+def total_mass(solver, r_lo, r_hi, splits=(), n_r=80, n_theta=80, ct=0.0, x_centre=0.0):
+    """E/c² (kg) of the Eulerian energy density at time ct (metres), over the shell r_lo ≤ r ≤ r_hi
+    around the bubble centre x_centre (metres along x).
 
     Gauss–Legendre in r (one block per interval between splits) and in polar angle θ about the
     direction of motion; the bubble is symmetric about that axis, so dV = 2π r² sin θ dr dθ.
@@ -149,7 +160,7 @@ def total_mass(solver, r_lo, r_hi, splits=(), n_r=80, n_theta=80):
     tx, tw = np.polynomial.legendre.leggauss(n_theta)
     th, wt = np.pi / 2 * (tx + 1), np.pi / 2 * tw
     rr, tt = np.meshgrid(r, th, indexing="ij")
-    rho = eulerian_stress_si(solver, 0.0, rr * np.cos(tt), rr * np.sin(tt), 0.0 * rr)[0, 0]
+    rho = eulerian_stress_si(solver, ct, x_centre + rr * np.cos(tt), rr * np.sin(tt), 0.0 * rr)[0, 0]
     return float(np.sum(rho * 2 * np.pi * rr**2 * np.sin(tt) * wr[:, None] * wt[None, :])) / c**2
 
 
@@ -157,29 +168,45 @@ def paper_alcubierre_check(spacing=5.0, half_length=600.0, half_height=450.0):
     """WarpFactory's finite-difference pipeline (as in the MATLAB original) on the paper's case.
 
     Returns the grid's x, y (z = 0 plane, y ≥ 0) and the Eulerian energy density there (J/m³),
-    away from the grid edges where the 4th-order stencil is one-sided. The peak is on the
-    equator near r = R, so half_height must reach well past R.
+    away from the grid edges where the 4th-order stencil is one-sided. The grid extends 4 rows
+    below y = 0 so the axis is interior, not a grid edge. The peak is on the equator near r = R,
+    so half_height must reach well past R.
     """
     p = PAPER_ALCUBIERRE
-    nx, ny, nz = int(2 * half_length / spacing) + 1, int(half_height / spacing) + 1, 9
-    centre = (0.0, (nx - 1) * spacing / 2, 0.0, (nz - 1) * spacing / 2)
+    pad = 4
+    nx, ny, nz = int(2 * half_length / spacing) + 1, int(half_height / spacing) + 1 + pad, 9
+    centre = (0.0, (nx - 1) * spacing / 2, pad * spacing, (nz - 1) * spacing / 2)
     metric = alcubierre_metric((1, nx, ny, nz), centre, v=p["v"], R=p["R"], sigma=p["sigma"],
                                grid_scale=(1, spacing, spacing, spacing))
     T = GridSolver(order=4).solve(metric)
     rho = stress_energy_to_si(do_frame_transfer(metric, T)).tensor[0, 0, 0, :, :, nz // 2]
     x = np.arange(nx) * spacing - centre[1]
-    y = np.arange(ny) * spacing
-    keep = (slice(4, -4), slice(0, -4))           # y = 0 is the axis, not an edge of the bubble
+    y = np.arange(ny) * spacing - centre[2]
+    keep = (slice(pad, -pad), slice(pad, -pad))   # first kept row is y = 0, with 4 rows below it
     return x[keep[0]], y[keep[1]], rho[keep]
 
 
 def energy_condition_maps(solver, half_width, n=160, num_angular_vec=100, num_time_vec=10):
     """WarpFactory's energy-condition maps on the z = 0 plane at ct = 0 (x along the motion).
 
-    For each condition, the most-violating value over the sampled observers at every point,
-    in J/m³; negative means violated. An even n keeps the bubble centre off the grid.
-    Returns (x, y, {condition: map}).
+    For each condition, WarpFactory's most-violating *score* over its sampled observer field at
+    every point (scaled to J/m³); negative means a violation was found. These are diagnostic
+    scores, not energies a physical observer measures: the port normalises observer vectors by
+    Euclidean length and its "timelike" field includes speed c. Sampling can miss a violation,
+    so a non-negative score means "none detected", not "the condition holds".
+
+    Also returned: axial_null, the null-condition contraction T_âb̂ k^â k^b̂ for the six axial null
+    directions k = (1, ±ê)/√2 (same normalisation), computed here from WarpFactory's own
+    Eulerian-frame tensor. For a null k the strong condition's trace term drops out, so the same
+    value also witnesses the strong condition. Note the pinned port's dominant-condition test
+    checks only that the energy flux is not spacelike, not that it is future-directed: its
+    negative scores are genuine violations, but it is a narrower test than the full condition.
+
+    n must be even, which keeps the bubble centre (a coordinate singularity of r) off the grid.
+    Returns (x, y, {condition: map}, axial_null); x, y are pixel centres, spacing 2·half_width/n.
     """
+    if n % 2:
+        raise ValueError("n must be even (an odd grid puts a point at the bubble centre)")
     h = 2.0 * half_width / n
     size, centre, scale = (1, n, n, 1), (0.0, half_width - h / 2, half_width - h / 2, 0.0), (1, h, h, h)
     metric = solver.metric_on_grid(size, centre, scale)
@@ -187,5 +214,13 @@ def energy_condition_maps(solver, half_width, n=160, num_angular_vec=100, num_ti
     maps = {cond: get_energy_conditions(T, metric, cond, num_angular_vec=num_angular_vec,
                                         num_time_vec=num_time_vec)[0, :, :, 0] * si_energy_factor()
             for cond in CONDITIONS}
+    local = do_frame_transfer(metric, T).tensor[:, :, 0, :, :, 0]   # contravariant, Eulerian frame
+    T_low = local * np.array([-1.0, 1, 1, 1])[:, None, None, None] * np.array([-1.0, 1, 1, 1])[None, :, None, None]
+    axial = np.full(local.shape[2:], np.inf)
+    for i in (1, 2, 3):
+        for sgn in (1.0, -1.0):
+            k = np.zeros(4)
+            k[0], k[i] = 1.0 / np.sqrt(2.0), sgn / np.sqrt(2.0)
+            axial = np.minimum(axial, np.einsum("mn...,m,n->...", T_low, k, k))
     x = np.arange(n) * h - centre[1]
-    return x, x.copy(), maps
+    return x, x.copy(), maps, axial * si_energy_factor()
