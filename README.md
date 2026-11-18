@@ -6,7 +6,7 @@ dual-shell always-on design. Each chart comes with a plain-English caption.
 
 The full spec is in [`docs/warp-bubble-notebook-spec.md`](docs/warp-bubble-notebook-spec.md).
 
-> **Status (2026-11-17):** Sections 1 (wall shapes), 2 (energy vs wall thickness), 3 (quantum inequality) and 4 (dual-shell design) are done. The animation, time-dependent stresses and curvature, the WarpFactory comparison and `summary.pdf` are still to come.
+> **Status (2026-11-17):** Sections 1 (wall shapes), 2 (energy vs wall thickness), 3 (quantum inequality), 4 (dual-shell design) and 5 (animation) are done. The time-dependent stresses and curvature, the WarpFactory comparison and `summary.pdf` are still to come.
 
 ## Setup
 
@@ -30,10 +30,12 @@ python3 -m venv .venv
 - `warp/energy.py`: total negative energy of a steady bubble, in SI units.
 - `warp/curvature.py`, `warp/quantum.py`: space-time curvature, and the quantum-inequality test.
 - `warp/dual_shell.py`: the dual-shell design and its alternatives.
+- `warp/animate.py`: the dual-shell animation (GIF + MP4) and still frames.
 - `warp/plotting.py`: phone-readable figure style; draws each caption into its PNG.
 - `tests/`: checks for every shape function (`.venv/bin/pytest`).
 
 ## Outputs
 
-- `figures/`: PNGs sized for a phone (to share as images).
+- `figures/`: PNGs sized for a phone (to share as images), plus the animation as GIF and MP4
+  (the MP4 is much smaller and plays well in messaging apps).
 - `summary.pdf`: 3–5 pages, one chart per page with captions, ready to print.
